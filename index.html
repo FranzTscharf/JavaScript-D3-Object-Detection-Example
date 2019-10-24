@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- UIkit CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.2.1/dist/css/uikit.min.css" />
+
+<!-- UIkit JS -->
+<script src="https://cdn.jsdelivr.net/npm/uikit@3.2.1/dist/js/uikit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/uikit@3.2.1/dist/js/uikit-icons.min.js"></script>
+  <link href='https://fonts.googleapis.com/css?family=Lato:300,900' rel='stylesheet' type='text/css'>
+      <title>Title</title>
+      <style>
+        #svgWrapper{
+          font-family: 'Lato';
+          margin: 0;
+          overflow: hidden;
+        }
+        .handle{
+          fill: grey;
+          fill-opacity: 0.1;
+          cursor: move;
+          stroke-dasharray: 5;
+          stroke: grey;
+          r: 10;
+        }
+        
+        .bottomright{
+          cursor: move;
+        }
+        .topleft{
+          cursor: move;
+        }
+        .topright{
+          fill: #fff;
+          fill-opacity: 1;
+          stroke-dasharray: 0;
+          stroke:#E8336D;
+          r:10;
+        }
+        .resizing {
+          fill: blue;
+        }
+        
+        .moving {
+          fill: transparent;
+        }
+        
+        #controls {
+          position: absolute;
+          top: 0;
+        }
+        
+        #controls input {
+          width: 3em;
+        }
+
+         :root {
+          --accent-color: #E8336D;
+        }
+
+     svg {
+        font-family: 'Lato';
+        width: 100%;
+        height: 100%;
+     }
+
+    .annotation path {
+      stroke: var(--accent-color);
+      fill: none;
+    }
+
+    text.title {
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+
+    .img-overlay-wrap {
+      position: relative;
+      display: inline-block; /* <= shrinks container to image size */
+      transition: transform 150ms ease-in-out;
+    }
+
+    .img-overlay-wrap img { /* <= optional, for responsiveness */
+      display: block;
+      max-width: 75%;
+      height: auto;
+    }
+
+    .img-overlay-wrap svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+      </style>
+    </head>
+<body>
+  <div class="img-overlay-wrap">
+      <image id="documentPicture" src="./example.jpg"></image>
+      <div id="svgWrapper">
+        <svg></svg>
+      </div>
+  </div>
+<fieldset id="controls">
+  <label>x:<input type="text" id="x"></label>
+  <label>y:<input type="text" id="y"></label>
+  <label>width:<input type="text" id="width"></label>
+  <label>height:<input type="text" id="height"></label>
+</fieldset>
+
+<script src="https://d3js.org/d3.v4.js"></script>
+<script>
+
+  data = [
+    {id: 1, x: -75, y: -75, width: 150, height: 150}
+  ];
+
+  var MAP_HEIGHT = 2500;
+  var MAP_WIDTH = MAP_HEIGHT * Math.sqrt(2);
+
+  var MAX_TRANSLATE_X = MAP_WIDTH / 2;
+  var MIN_TRANSLATE_X = -MAX_TRANSLATE_X;
+
+  var MAX_TRANSLATE_Y = MAP_HEIGHT / 2;
+  var MIN_TRANSLATE_Y = -MAX_TRANSLATE_Y;
+
+  var MIN_RECT_WIDTH = 5;
+  var MIN_RECT_HEIGHT = 5;
+
+  var HANDLE_R = 5;
+  var HANDLE_R_ACTIVE = 12;
+
+  var wrapper = document.getElementById("svgWrapper");
+
+  var height = wrapper.offsetHeight;
+  var width = wrapper.offsetWidth;
+
+  var
+    inpX = document.getElementById("x"),
+    inpY = document.getElementById("y"),
+    inpWidth = document.getElementById("width"),
+    inpHeight = document.getElementById("height");
+
+  var svg = d3.select("svg");
+
+  // for the background
+  svg.append("rect")
+    .style("fill", "transparent")
+    .attr("width", "100%")
+    .attr("height", "100%");
+
+  var g = svg.append("g");
+
+  g.append("rect")
+    .style("fill", "transparent")
+    .attr("x", MIN_TRANSLATE_X)
+    .attr("y", MIN_TRANSLATE_Y)
+    .attr("width", MAP_WIDTH)
+    .attr("height", MAP_HEIGHT);
+
+  function resizerHover() {
+    var el = d3.select(this), isEntering = d3.event.type === "mouseenter";
+    el
+      .classed("hovering", isEntering)
+      .attr(
+        "r",
+        isEntering || el.classed("resizing") ?
+          HANDLE_R_ACTIVE : HANDLE_R
+      );
+  }
+
+  function rectResizeStartEnd() {
+    var el = d3.select(this), isStarting = d3.event.type === "start";
+    d3.select(this)
+      .classed("resizing", isStarting)
+      .attr(
+        "r",
+        isStarting || el.classed("hovering") ?
+          HANDLE_R_ACTIVE : HANDLE_R
+      );
+  }
+
+  function rectResizing(d) {
+  
+    //document.querySelector("#deleteIcon").setAttribute("cx",d.width)
+    var dragX = Math.max(
+      Math.min(d3.event.x, MAX_TRANSLATE_X),
+      MIN_TRANSLATE_X
+    );
+
+    var dragY = Math.max(
+      Math.min(d3.event.y, MAX_TRANSLATE_Y),
+      MIN_TRANSLATE_Y
+    );
+
+    if (d3.select(this).classed("topleft")) {
+
+      var newWidth = Math.max(d.width + d.x - dragX, MIN_RECT_WIDTH);
+
+      d.x += d.width - newWidth;
+      d.width = newWidth;
+
+      var newHeight = Math.max(d.height + d.y - dragY, MIN_RECT_HEIGHT);
+
+      d.y += d.height - newHeight;
+      d.height = newHeight;
+
+    } else {
+
+      d.width = Math.max(dragX - d.x, MIN_RECT_WIDTH);
+      d.height = Math.max(dragY - d.y, MIN_RECT_HEIGHT);
+
+    }
+
+    update();
+  }
+
+  function rectMoveStartEnd(d) {
+    d3.select(this).classed("moving", d3.event.type === "start");
+  }
+
+  function rectMoving(d) {
+
+    var dragX = Math.max(
+      Math.min(d3.event.x, MAX_TRANSLATE_X - d.width),
+      MIN_TRANSLATE_X
+    );
+
+    var dragY = Math.max(
+      Math.min(d3.event.y, MAX_TRANSLATE_Y - d.height),
+      MIN_TRANSLATE_Y
+    );
+
+    d.x = dragX;
+    d.y = dragY;
+
+    update();
+  }
+
+  function update() {
+
+    var rects = g.selectAll("g.rectangle").data(data, function (d) {
+        return d;
+    });
+
+    rects.exit().remove();
+
+    var newRects = rects.enter().append("g").classed("rectangle", true);
+
+    newRects.append("rect")
+      .classed("bg", true)
+      .attr("fill", "transparent")
+      .attr("stroke", "#E8336D")
+      .attr("stroke-width", 1)
+      .call(d3.drag()
+        .container(g.node())
+        .on("start end", rectMoveStartEnd)
+        .on("drag", rectMoving)
+    );
+
+    newRects.append("g").classed("circles", true).each(function (d) {
+        var circleG = d3.select(this);
+        var editCircle = circleG.append("circle")
+                .classed("topright", true)
+                .attr("id", "deleteIcon")
+                .attr("cx", d.width)
+                .attr("cy", 0)
+                .attr("r", HANDLE_R)
+                .on("mouseenter", function(d){
+                      g.select("circle.topright").style('fill', '#E8336D')
+                      g.selectAll("path").each(function(d,i) {
+                          d3.select(this).attr("stroke","white");
+                      });
+                })
+                .on("mouseleave", function(d){
+                      g.select("circle.topright").style('fill', '#fff')
+                      g.selectAll("path").each(function(d,i) {
+                          d3.select(this).attr("stroke","#E8336D");
+                      });
+                })
+                .on("click", function(d) {
+                  alert("on click" + d.className);
+                });
+
+        circleG.append("circle")
+          .classed("topleft", true)
+          .style('fill', "grey")
+          .style('fill-opacity', '0.1')
+          .style('cursor', 'move')
+          .style('stroke-dasharray','5')
+          .style('stroke', 'grey')
+          .style('r', 10)
+          .attr("r", HANDLE_R)
+          .on("mouseenter mouseleave", resizerHover)
+          .call(d3.drag()
+            .container(g.node())
+            .subject(function () {
+              return {x: d3.event.x, y: d3.event.y};
+            })
+            .on("start end", rectResizeStartEnd)
+            .on("drag", rectResizing)
+          );
+
+        circleG
+          .append("circle")
+          .classed("bottomright", true)
+          .style('fill', "grey")
+          .style('fill-opacity', '0.1')
+          .style('cursor', 'move')
+          .style('stroke-dasharray','5')
+          .style('stroke', 'grey')
+          .style('r', 10)
+          .attr("r", HANDLE_R)
+          .on("mouseenter mouseleave", resizerHover)
+          .call(d3.drag()
+            .container(g.node())
+            .subject(function () {
+              return {x: d3.event.x, y: d3.event.y};
+            })
+            .on("start end", rectResizeStartEnd)
+            .on("drag", rectResizing)
+          );
+
+        var editIcon = circleG.append("svg").attr("x", d.width).attr("y", -8).classed("toprightsvg", true);
+        editIcon.append("path").attr("stroke", "#E8336D").attr("stroke-width","1.06").attr("d","M16,16 L4,4").attr("transform", "scale(0.8)");
+        editIcon.append("path").attr("stroke", "#E8336D").attr("stroke-width","1.06").attr("d","M16,4 L4,16").attr("transform", "scale(0.8)");
+
+      });
+    var allRects = newRects.merge(rects);
+
+    allRects
+      .attr("transform", function (d) {
+        return "translate(" + d.x + "," + d.y + ")";
+      });
+
+    allRects
+      .select("rect.bg")
+      .attr("height", function (d) {
+        return d.height;
+      })
+      .attr("width", function (d) {
+        return d.width;
+      });
+
+    allRects
+      .select("circle.bottomright")
+      .attr("cx", function (d) {
+        return d.width;
+      })
+      .attr("cy", function (d) {
+        return d.height;
+      });
+    allRects
+      .select("circle.topright")
+      .attr("cx", function (d) {
+        return d.width;
+      });
+    allRects
+      .select("svg.toprightsvg")
+      .attr("x", function (d) {
+        return d.width -8.1;
+      })
+
+    inpX.value = data[0].x;
+    inpY.value = data[0].y;
+    inpWidth.value = data[0].width;
+    inpHeight.value = data[0].height;
+  }
+
+  function controlChange() {
+    data[0][this.id] = +this.value;
+    update();
+  }
+
+  [inpX, inpY, inpWidth, inpHeight].forEach(function (e) {
+    e.addEventListener("change", controlChange);
+  });
+  update();
+
+</script>
+</body>
+</html>

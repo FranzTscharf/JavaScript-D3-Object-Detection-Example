@@ -4,3 +4,9 @@ The following example is giving to draw bounding boxes for the Object Detection 
 
 # Screen Shot of index.html
 ![alt text](./ScreenShot.png)
+
+# Libraries
+- JQuery
+- D3
+- Google font lato
+- UIkit v3
